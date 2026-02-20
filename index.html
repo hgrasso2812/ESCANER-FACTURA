@@ -3,58 +3,55 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Scanner ARCA Seguro</title>
+    <title>Scanner ARCA Contable</title>
     <script src="https://unpkg.com/html5-qrcode"></script>
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body class="bg-slate-900 min-h-screen p-4">
+<body class="bg-slate-900 min-h-screen p-4 flex flex-col items-center">
 
-    <div class="max-w-lg mx-auto bg-white rounded-3xl shadow-2xl overflow-hidden">
-        <div class="bg-blue-600 p-4 text-white text-center">
-            <h1 class="text-xl font-bold">Scanner Colppy HD</h1>
+    <div class="w-full max-w-lg bg-white rounded-3xl shadow-2xl overflow-hidden">
+        <div class="bg-blue-600 p-5 text-white text-center">
+            <h1 class="text-2xl font-black tracking-tight">Carga Colppy</h1>
+            <p class="text-blue-200 text-sm">Escáner de Facturas</p>
         </div>
 
-        <div class="p-4">
+        <div class="p-5">
             
-            <div id="status-msg" class="text-xs font-mono text-center mb-2 text-red-500 font-bold min-h-[20px]"></div>
-
-            <button id="btn-start" onclick="iniciarCamaraSegura()" class="w-full bg-blue-500 text-white py-4 rounded-xl font-bold mb-4 shadow-lg animate-pulse">
-                📸 TOCAR PARA INICIAR CÁMARA
+            <button id="btn-start" onclick="iniciarCamara()" class="w-full bg-blue-500 text-white py-5 rounded-2xl font-bold mb-4 shadow-lg active:scale-95 transition-transform text-lg">
+                📸 INICIAR CÁMARA
             </button>
 
-            <div id="reader" style="width: 100%; min-height: 250px; background: #111; border-radius: 1rem; overflow: hidden; display: none;"></div>
+            <div id="reader" style="width: 100%; min-height: 250px; background: #000; border-radius: 1rem; overflow: hidden; display: none;"></div>
             
-            <div id="controles-camara" class="hidden mt-4 bg-slate-100 p-4 rounded-2xl space-y-4">
-                <div class="flex items-center justify-between gap-4">
-                    <div class="flex-1">
-                        <label class="text-[10px] font-bold uppercase text-slate-500">Zoom Manual</label>
-                        <input type="range" id="zoom-range" min="1" max="5" step="0.1" value="1" 
-                               class="w-full h-2 bg-blue-200 rounded-lg appearance-none cursor-pointer">
-                    </div>
-                    <button onclick="alternarLinterna()" class="bg-white p-3 rounded-xl shadow-sm border border-slate-200 text-xl">🔦</button>
-                </div>
+            <div id="tips" class="hidden mt-4 bg-yellow-50 border border-yellow-200 p-3 rounded-xl">
+                <p class="text-xs text-yellow-800 text-center font-medium">
+                    💡 <b>Tip:</b> Alejá la factura unos 20cm. Si hay poca luz, prendé la linterna desde el menú de tu celular.
+                </p>
             </div>
 
             <div id="validation-modal" class="hidden fixed inset-0 bg-slate-900/95 flex items-center justify-center p-6 z-50">
                 <div class="bg-white p-6 rounded-3xl w-full max-w-sm text-center">
-                    <h2 class="font-black text-xl mb-1">¿COINCIDE EL NRO?</h2>
-                    <div id="qr-info" class="bg-blue-50 p-4 rounded-2xl font-mono text-3xl my-4 border-2 border-blue-200 text-blue-700 tracking-tighter"></div>
+                    <h2 class="font-black text-xl mb-1 text-slate-800">¿ES ESTA FACTURA?</h2>
+                    <p class="text-xs text-slate-500">Verificá el número con el papel</p>
+                    <div id="qr-info" class="bg-blue-50 p-4 rounded-2xl font-mono text-3xl my-4 border-2 border-blue-200 text-blue-700 tracking-tighter font-bold"></div>
                     <div class="flex gap-3">
-                        <button onclick="cancelarEscaneo()" class="flex-1 bg-slate-100 py-4 rounded-2xl font-bold text-slate-500">NO</button>
-                        <button onclick="confirmarFactura()" class="flex-1 bg-blue-600 text-white py-4 rounded-2xl font-bold">SÍ, ES IGUAL</button>
+                        <button onclick="cancelarEscaneo()" class="flex-1 bg-slate-100 py-4 rounded-2xl font-bold text-slate-500">NO, DESCARTAR</button>
+                        <button onclick="confirmarFactura()" class="flex-1 bg-blue-600 text-white py-4 rounded-2xl font-bold">SÍ, GUARDAR</button>
                     </div>
                 </div>
             </div>
 
-            <div class="mt-6 border-t pt-4">
-                <div class="flex justify-between items-end mb-2">
-                    <h3 class="font-bold text-sm text-slate-600 uppercase">Cargadas: <span id="count" class="text-blue-600">0</span></h3>
-                    <button onclick="limpiarTabla()" class="text-[10px] font-bold text-red-400 border border-red-200 px-2 py-1 rounded">BORRAR TODO</button>
+            <div class="mt-8">
+                <div class="flex justify-between items-center mb-3">
+                    <h3 class="font-bold text-slate-700">Facturas Leídas: <span id="count" class="text-blue-600">0</span></h3>
+                    <button onclick="limpiarTabla()" class="text-xs font-bold text-red-500 bg-red-50 px-3 py-1 rounded-lg">Vaciar Lista</button>
                 </div>
-                <div id="lista" class="space-y-2 max-h-40 overflow-y-auto"></div>
+                <div id="lista" class="space-y-2 max-h-48 overflow-y-auto pr-1"></div>
             </div>
 
-            <button onclick="exportarColppy()" class="w-full mt-4 bg-emerald-600 text-white py-4 rounded-2xl font-bold shadow-lg">DESCARGAR PARA COLPPY</button>
+            <button onclick="exportarColppy()" class="w-full mt-6 bg-emerald-600 text-white py-4 rounded-2xl font-bold shadow-lg active:scale-95 transition-transform">
+                📥 DESCARGAR CSV (COLPPY)
+            </button>
         </div>
     </div>
 
@@ -65,15 +62,10 @@
 
         const mapLetra = { 1: "A", 2: "A", 3: "A", 6: "B", 7: "B", 8: "B", 11: "C", 12: "C", 13: "C" };
 
-        function logError(msg) {
-            document.getElementById('status-msg').innerText = msg;
-        }
-
         function onScanSuccess(decodedText) {
             try {
                 const url = new URL(decodedText);
-                const pData = url.searchParams.get("p");
-                const data = JSON.parse(atob(pData));
+                const data = JSON.parse(atob(url.searchParams.get("p")));
                 
                 facturaTemporal = {
                     fecha: data.fecha.split('-').reverse().join('/'),
@@ -87,23 +79,20 @@
                 document.getElementById('validation-modal').classList.remove('hidden');
                 if(html5QrCode) html5QrCode.pause();
             } catch (e) {
-                // Si lee un QR que no es de AFIP, lo ignoramos silenciosamente
-                console.log("QR no reconocido");
+                // QR Inválido
             }
         }
 
-        async function iniciarCamaraSegura() {
-            logError("Pidiendo permisos...");
+        async function iniciarCamara() {
             document.getElementById('btn-start').classList.add('hidden');
             document.getElementById('reader').style.display = "block";
+            document.getElementById('tips').classList.remove('hidden');
 
             html5QrCode = new Html5Qrcode("reader");
 
             try {
-                // Paso 1: Pedir lista de cámaras (esto fuerza la pregunta de permisos)
                 const devices = await Html5Qrcode.getCameras();
                 if (devices && devices.length) {
-                    // Buscar la cámara trasera. Si hay varias, suele ser la última del array en móviles
                     let cameraId = devices[devices.length - 1].id; 
                     for (const device of devices) {
                         if (device.label.toLowerCase().includes("back") || device.label.toLowerCase().includes("trasera")) {
@@ -112,50 +101,23 @@
                         }
                     }
 
-                    logError("Iniciando cámara trasera...");
-
-                    // Paso 2: Iniciar con el ID específico
+                    // Forzamos resolución alta para leer puntos chicos
                     await html5QrCode.start(
                         cameraId, 
-                        { fps: 15, qrbox: { width: 250, height: 250 } },
+                        { 
+                            fps: 15, 
+                            qrbox: { width: 250, height: 250 },
+                            videoConstraints: { width: { ideal: 1920 }, height: { ideal: 1080 } } 
+                        },
                         onScanSuccess
                     );
-
-                    logError(""); // Limpiar errores
-                    document.getElementById('controles-camara').classList.remove('hidden');
-
                 } else {
-                    logError("No se encontraron cámaras en el dispositivo.");
+                    alert("No se detectó cámara.");
                 }
             } catch (err) {
-                document.getElementById('btn-start').classList.remove('hidden');
-                document.getElementById('reader').style.display = "none";
-                logError("Error: " + err.message || err);
+                alert("Error al acceder a la cámara. Revisa los permisos del navegador.");
             }
         }
-
-        async function alternarLinterna() {
-            try {
-                if(!html5QrCode) return;
-                const track = html5QrCode.getRunningTrack();
-                if (track && track.getCapabilities().torch) {
-                    const isTorchOn = track.getSettings().torch;
-                    await track.applyConstraints({ advanced: [{ torch: !isTorchOn }] });
-                } else {
-                    alert("Tu celular no permite controlar el flash desde el navegador web.");
-                }
-            } catch (e) { console.error("Error flash", e); }
-        }
-
-        document.getElementById('zoom-range').addEventListener('input', async (e) => {
-            try {
-                if(!html5QrCode) return;
-                const track = html5QrCode.getRunningTrack();
-                if (track && track.getCapabilities().zoom) {
-                    await track.applyConstraints({ advanced: [{ zoom: parseFloat(e.target.value) }] });
-                }
-            } catch (err) { console.error("Error zoom", err); }
-        });
 
         function confirmarFactura() {
             facturas.push(facturaTemporal);
@@ -172,16 +134,16 @@
         function actualizarInterfaz() {
             const lista = document.getElementById('lista');
             lista.innerHTML = facturas.map(f => `
-                <div class="flex justify-between bg-slate-50 p-3 rounded-xl border border-slate-100 text-xs">
-                    <span class="font-mono font-bold">${f.letra} ${f.nro}</span>
-                    <span class="text-blue-600 font-black">$${f.importe}</span>
+                <div class="flex justify-between items-center bg-slate-50 p-3 rounded-xl border border-slate-200">
+                    <span class="font-mono font-bold text-slate-700">${f.letra} ${f.nro}</span>
+                    <span class="text-blue-600 font-black text-lg">$${f.importe}</span>
                 </div>
             `).join('');
             document.getElementById('count').innerText = facturas.length;
         }
 
         function exportarColppy() {
-            if (facturas.length === 0) return alert("Cargá alguna factura primero");
+            if (facturas.length === 0) return alert("Cargá al menos una factura primero.");
             let csv = "Tipo de Comprobante;Letra;Razon Social;CUIT;Numero;Fecha Contable;Fecha Factura;Total\n";
             facturas.forEach(f => {
                 csv += `FAC;${f.letra};;${f.cuit};${f.nro};${f.fecha};${f.fecha};${f.importe}\n`;
@@ -190,12 +152,12 @@
             const url = URL.createObjectURL(blob);
             const a = document.createElement("a");
             a.href = url;
-            a.download = "carga_colppy.csv";
+            a.download = `Colppy_${new Date().toLocaleDateString().replace(/\//g,'-')}.csv`;
             a.click();
         }
 
         function limpiarTabla() {
-            if(confirm("¿Borrar lista?")) {
+            if(confirm("¿Seguro que querés borrar todo lo escaneado?")) {
                 facturas = [];
                 actualizarInterfaz();
             }

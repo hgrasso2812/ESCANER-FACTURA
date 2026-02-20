@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scanner ARCA para Colppy</title>
+    <script src="https://unpkg.com/html5-qrcode"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 p-4">
+    <div class="max-w-2xl mx-auto bg-white p-6 rounded-lg shadow-lg">
+        <h1 class="text-2xl font-bold text-center mb-4 text-blue-600">Scanner Contable</h1>
+        
+        <div id="reader" class="overflow-hidden rounded-lg border-2 border-dashed border-gray-300"></div>
+        
+        <div id="validation-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4">
+            <div class="bg-white p-6 rounded-lg w-full max-w-sm">
+                <h2 class="font-bold text-lg mb-2">Validar Comprobante</h2>
+                <p class="text-sm text-gray-600 mb-4">El QR dice que la factura es:</p>
+                <div id="qr-info" class="bg-yellow-100 p-3 rounded font-mono text-center text-xl mb-4 border border-yellow-400"></div>
+                <p class="text-sm mb-4 italic">¿Coincide con el número que ves en el papel?</p>
+                <div class="flex gap-2">
+                    <button onclick="cancelarEscaneo()" class="flex-1 bg-gray-200 py-2 rounded">No, descartar</button>
+                    <button onclick="confirmarFactura()" class="flex-1 bg-green-500 text-white py-2 rounded font-bold">Sí, es correcta</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="mt-8">
+            <div class="flex justify-between items-center mb-2">
+                <h3 class="font-bold">Facturas Escaneadas (<span id="count">0</span>)</h3>
+                <button onclick="limpiarTabla()" class="text-red-500 text-sm">Limpiar todo</button>
+            </div>
+            <div class="overflow-x-auto">
+                <table id="facturaTable" class="w-full text-xs text-left border-collapse border border-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="border p-2">Fecha</th>
+                            <th class="border p-2">Número</th>
+                            <th class="border p-2">Total</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4 mt-6">
+            <button onclick="exportarNormal()" class="bg-blue-500 text-white p-3 rounded-lg font-bold shadow-md hover:bg-blue-600">MODO NORMAL (WhatsApp)</button>
+            <button onclick="exportarColppy()" class="bg-green-600 text-white p-3 rounded-lg font-bold shadow-md hover:bg-green-700">MODO COLPPY (CSV)</button>
+        </div>
+    </div>
+
+    <script>
+        let facturas = [];
+        let facturaTemporal = null;
+
+        // Diccionarios de AFIP a Letra
+        const mapLetra = { 1: "A", 2: "A", 3: "A", 6: "B", 7: "B", 8: "B", 11: "C", 12: "C", 13: "C" };
+        const mapTipo = { 1: "FAC", 6: "FAC", 11: "FAC" }; // Simplificado, Colppy suele usar FAC para facturas
+
+        const html5QrCode = new Html5Qrcode("reader");
+
+        function onScanSuccess(decodedText) {
+            try {
+                const url = new URL(decodedText);
+                const p = url.searchParams.get("p");
+                const data = JSON.parse(atob(p));
+
+                // Formatear datos
+                const ptoVta = data.ptoVta.toString().padStart(5, '0');
+                const nroCmp = data.nroCmp.toString().padStart(8, '0');
+                const fullNro = `${ptoVta}-${nroCmp}`;
+                const fechaLegible = data.fecha.split('-').reverse().join('/'); // AAAA-MM-DD a DD/MM/AAAA
+
+                facturaTemporal = {
+                    fecha: fechaLegible,
+                    letra: mapLetra[data.tipoCmp] || "C",
+                    tipo: "FAC",
+                    nro: fullNro,
+                    cuit: data.cuit,
+                    importe: data.importe.toFixed(2).replace('.', ',')
+                };
+
+                // Mostrar Modal de Validación
+                document.getElementById('qr-info').innerText = fullNro;
+                document.getElementById('validation-modal').classList.remove('hidden');
+                html5QrCode.pause(); // Pausar cámara mientras valida
+            } catch (e) {
+                alert("QR no válido de AFIP/ARCA");
+            }
+        }
+
+        function confirmarFactura() {
+            facturas.push(facturaTemporal);
+            actualizarTabla();
+            document.getElementById('validation-modal').classList.add('hidden');
+            html5QrCode.resume();
+        }
+
+        function cancelarEscaneo() {
+            document.getElementById('validation-modal').classList.add('hidden');
+            html5QrCode.resume();
+        }
+
+        function actualizarTabla() {
+            const tbody = document.querySelector("#facturaTable tbody");
+            tbody.innerHTML = "";
+            facturas.forEach(f => {
+                tbody.innerHTML += `<tr><td class="border p-2">${f.fecha}</td><td class="border p-2">${f.nro}</td><td class="border p-2">$${f.importe}</td></tr>`;
+            });
+            document.getElementById('count').innerText = facturas.length;
+        }
+
+        function exportarNormal() {
+            let texto = "LISTA DE FACTURAS:\n";
+            facturas.forEach(f => {
+                texto += `${f.fecha} | ${f.letra} | ${f.nro} | $${f.importe}\n`;
+            });
+            navigator.clipboard.writeText(texto);
+            alert("Copiado al portapapeles para enviar por WhatsApp");
+        }
+
+        function exportarColppy() {
+            // Cabecera simplificada basada en tu CSV
+            let csvContent = "Tipo de Comprobante;Letra;Razon Social;CUIT;Numero;Fecha Contable;Fecha Factura;Total\n";
+            facturas.forEach(f => {
+                // En Factura C (tipo 11), el total va a Neto No Gravado o similar, aquí lo ponemos en Total para simplificar
+                csvContent += `${f.tipo};${f.letra};;${f.cuit};${f.nro};${f.fecha};${f.fecha};${f.importe}\n`;
+            });
+            
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement("a");
+            link.href = URL.createObjectURL(blob);
+            link.setAttribute("download", "importar_colppy.csv");
+            link.click();
+        }
+
+        function limpiarTabla() { if(confirm("¿Borrar todo?")) { facturas = []; actualizarTabla(); } }
+
+        // Iniciar Cámara
+        html5QrCode.start({ facingMode: "environment" }, { fps: 10, qrbox: 250 }, onScanSuccess);
+    </script>
+</body>
+</html>

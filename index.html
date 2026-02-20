@@ -3,202 +3,151 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Scanner Contable HD - Colppy</title>
+    <title>Scanner ARCA Pro</title>
     <script src="https://unpkg.com/html5-qrcode"></script>
     <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-        #reader { width: 100%; border-radius: 15px; overflow: hidden; background: black; }
-        /* Mejora visual del cuadro de escaneo */
-        #reader__scan_region video { object-fit: cover !important; }
-    </style>
 </head>
-<body class="bg-slate-900 min-h-screen p-4 font-sans text-slate-800">
+<body class="bg-slate-900 min-h-screen p-4">
 
     <div class="max-w-lg mx-auto bg-white rounded-3xl shadow-2xl overflow-hidden">
-        <div class="bg-blue-600 p-6 text-white text-center">
-            <h1 class="text-2xl font-bold">Scanner Colppy</h1>
-            <p class="text-blue-100 text-sm">Validación Anti-Fraude ARCA</p>
+        <div class="bg-blue-600 p-4 text-white text-center">
+            <h1 class="text-xl font-bold">Scanner Colppy HD</h1>
         </div>
 
         <div class="p-4">
-            <div class="relative">
-                <div id="reader"></div>
-                
-                <div class="absolute bottom-4 left-0 right-0 px-4 flex justify-between items-center bg-black/40 py-2 rounded-lg mx-4">
-                    <div class="flex flex-col w-full mr-4">
-                        <label class="text-[10px] text-white uppercase font-bold mb-1">Zoom Manual</label>
+            <div id="reader" class="bg-black rounded-2xl overflow-hidden"></div>
+            
+            <div class="mt-4 bg-slate-100 p-4 rounded-2xl space-y-4">
+                <div class="flex items-center justify-between gap-4">
+                    <div class="flex-1">
+                        <label class="text-[10px] font-bold uppercase text-slate-500">Zoom Manual</label>
                         <input type="range" id="zoom-range" min="1" max="5" step="0.1" value="1" 
-                               class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+                               class="w-full h-2 bg-blue-200 rounded-lg appearance-none cursor-pointer">
                     </div>
-                    <button onclick="alternarLinterna()" class="bg-yellow-400 p-3 rounded-full shadow-lg text-lg">🔦</button>
+                    <button id="torch-button" onclick="alternarLinterna()" class="bg-white p-3 rounded-xl shadow-sm border border-slate-200 text-xl">🔦</button>
                 </div>
+                <p class="text-[10px] text-center text-slate-400 uppercase tracking-widest font-bold">Toca el video si no enfoca</p>
             </div>
 
-            <p class="text-center text-xs text-slate-400 mt-4 italic">
-                Toca el video para enfocar. Usá el slider si el QR es muy chico.
-            </p>
-
-            <div id="validation-modal" class="hidden fixed inset-0 bg-slate-900/90 flex items-center justify-center p-6 z-50">
-                <div class="bg-white p-6 rounded-2xl w-full max-w-sm shadow-2xl">
-                    <h2 class="font-black text-xl mb-2 text-center text-slate-800">¿COINCIDE EL NÚMERO?</h2>
-                    <p class="text-sm text-slate-500 mb-4 text-center">Verificá el número impreso en el papel:</p>
-                    <div id="qr-info" class="bg-blue-50 p-5 rounded-xl font-mono text-center text-3xl mb-6 border-2 border-blue-200 text-blue-700 tracking-tighter"></div>
+            <div id="validation-modal" class="hidden fixed inset-0 bg-slate-900/95 flex items-center justify-center p-6 z-50">
+                <div class="bg-white p-6 rounded-3xl w-full max-w-sm text-center">
+                    <h2 class="font-black text-xl mb-1">¿COINCIDE EL NRO?</h2>
+                    <div id="qr-info" class="bg-blue-50 p-4 rounded-2xl font-mono text-3xl my-4 border-2 border-blue-200 text-blue-700 tracking-tighter"></div>
                     <div class="flex gap-3">
-                        <button onclick="cancelarEscaneo()" class="flex-1 bg-slate-200 py-4 rounded-xl font-bold text-slate-600">DESCARTAR</button>
-                        <button onclick="confirmarFactura()" class="flex-1 bg-blue-600 text-white py-4 rounded-xl font-bold shadow-lg shadow-blue-200">ES CORRECTA</button>
+                        <button onclick="cancelarEscaneo()" class="flex-1 bg-slate-100 py-4 rounded-2xl font-bold text-slate-500">NO</button>
+                        <button onclick="confirmarFactura()" class="flex-1 bg-blue-600 text-white py-4 rounded-2xl font-bold">SÍ, ES IGUAL</button>
                     </div>
                 </div>
             </div>
 
-            <div class="mt-8">
-                <div class="flex justify-between items-center mb-4">
-                    <h3 class="font-bold text-lg">Cargas (<span id="count">0</span>)</h3>
-                    <button onclick="limpiarTabla()" class="text-red-500 text-xs font-bold border border-red-200 px-2 py-1 rounded">LIMPIAR LISTA</button>
+            <div class="mt-6">
+                <div class="flex justify-between items-end mb-2">
+                    <h3 class="font-bold">Cargadas: <span id="count" class="text-blue-600">0</span></h3>
+                    <button onclick="limpiarTabla()" class="text-[10px] font-bold text-red-400">BORRAR TODO</button>
                 </div>
-                <div class="max-h-48 overflow-y-auto rounded-xl border border-slate-100">
-                    <table id="facturaTable" class="w-full text-sm text-left border-collapse">
-                        <thead class="bg-slate-50 sticky top-0">
-                            <tr>
-                                <th class="p-3 text-slate-500 font-semibold border-b">Factura</th>
-                                <th class="p-3 text-slate-500 font-semibold border-b text-right">Importe</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-slate-50"></tbody>
-                    </table>
-                </div>
+                <div id="lista" class="space-y-2 max-h-40 overflow-y-auto"></div>
             </div>
 
-            <div class="grid grid-cols-1 gap-3 mt-6">
-                <button onclick="exportarColppy()" class="bg-emerald-500 text-white py-4 rounded-2xl font-bold shadow-lg shadow-emerald-100 flex items-center justify-center gap-2">
-                    📥 DESCARGAR PARA COLPPY
-                </button>
-                <button onclick="exportarNormal()" class="bg-slate-800 text-white py-3 rounded-2xl font-medium text-sm">
-                    Copiar Resumen (WhatsApp)
-                </button>
-            </div>
+            <button onclick="exportarColppy()" class="w-full mt-6 bg-emerald-600 text-white py-4 rounded-2xl font-bold shadow-lg">DESCARGAR PARA COLPPY</button>
         </div>
     </div>
 
     <script>
         let facturas = [];
         let facturaTemporal = null;
-        let linternaEncendida = false;
+        let stream = null;
         const html5QrCode = new Html5Qrcode("reader");
 
-        // Mapeo AFIP a Letra
-        const mapLetra = { 1: "A", 2: "A", 3: "A", 6: "B", 7: "B", 8: "B", 11: "C", 12: "C", 13: "C" };
+        // Forzar cámara trasera con restricciones más estrictas
+        const config = {
+            fps: 20,
+            qrbox: (w, h) => ({ width: w * 0.75, height: w * 0.75 }),
+            videoConstraints: {
+                facingMode: { exact: "environment" }, // "exact" obliga a usar la de atrás
+                width: { ideal: 1280 },
+                height: { ideal: 720 }
+            }
+        };
 
         function onScanSuccess(decodedText) {
             try {
                 const url = new URL(decodedText);
-                const p = url.searchParams.get("p");
-                const data = JSON.parse(atob(p));
-
-                const ptoVta = data.ptoVta.toString().padStart(5, '0');
-                const nroCmp = data.nroCmp.toString().padStart(8, '0');
-                const fullNro = `${ptoVta}-${nroCmp}`;
-                const fechaLegible = data.fecha.split('-').reverse().join('/');
-
+                const data = JSON.parse(atob(url.searchParams.get("p")));
                 facturaTemporal = {
-                    fecha: fechaLegible,
-                    letra: mapLetra[data.tipoCmp] || "C",
-                    tipo: "FAC",
-                    nro: fullNro,
+                    fecha: data.fecha.split('-').reverse().join('/'),
+                    let { 1:"A", 6:"B", 11:"C" }[data.tipoCmp] || "C",
+                    nro: `${data.ptoVta.toString().padStart(5,'0')}-${data.nroCmp.toString().padStart(8,'0')}`,
                     cuit: data.cuit,
                     importe: data.importe.toFixed(2).replace('.', ',')
                 };
-
-                document.getElementById('qr-info').innerText = fullNro;
+                document.getElementById('qr-info').innerText = facturaTemporal.nro;
                 document.getElementById('validation-modal').classList.remove('hidden');
                 html5QrCode.pause();
-            } catch (e) {
-                console.error("No es un QR de ARCA válido");
+            } catch (e) { console.error("QR Inválido"); }
+        }
+
+        async function iniciarCamara() {
+            try {
+                await html5QrCode.start({ facingMode: "environment" }, config, onScanSuccess);
+                // Una vez iniciada, obtenemos el "track" para el zoom y flash
+                const videoElement = document.querySelector('#reader video');
+                stream = videoElement.srcObject;
+            } catch (err) {
+                console.error("Error cámara trasera, probando modo flexible...");
+                // Si falla el "exact", probamos sin "exact"
+                await html5QrCode.start({ facingMode: "environment" }, { fps:20, qrbox:250 }, onScanSuccess);
             }
         }
 
-        function confirmarFactura() {
-            facturas.push(facturaTemporal);
-            actualizarTabla();
-            document.getElementById('validation-modal').classList.add('hidden');
-            html5QrCode.resume();
-        }
-
-        function cancelarEscaneo() {
-            document.getElementById('validation-modal').classList.add('hidden');
-            html5QrCode.resume();
-        }
-
-        function actualizarTabla() {
-            const tbody = document.querySelector("#facturaTable tbody");
-            tbody.innerHTML = "";
-            facturas.forEach(f => {
-                tbody.innerHTML += `<tr><td class="p-3 border-b font-medium">${f.letra} ${f.nro}</td><td class="p-3 border-b text-right font-bold text-emerald-600">$${f.importe}</td></tr>`;
-            });
-            document.getElementById('count').innerText = facturas.length;
-        }
-
-        // --- CÁMARA Y ZOOM ---
         async function alternarLinterna() {
             const track = html5QrCode.getRunningTrack();
             if (track && track.getCapabilities().torch) {
-                linternaEncendida = !linternaEncendida;
-                await track.applyConstraints({ advanced: [{ torch: linternaEncendida }] });
+                const currentTorch = track.getSettings().torch;
+                await track.applyConstraints({ advanced: [{ torch: !currentTorch }] });
+            } else {
+                alert("Flash no disponible en este navegador/celular.");
             }
         }
 
-        // Listener para el Slider de Zoom
         document.getElementById('zoom-range').addEventListener('input', async (e) => {
             const track = html5QrCode.getRunningTrack();
-            const val = e.target.value;
-            if (track) {
-                try {
-                    await track.applyConstraints({ advanced: [{ zoom: val }] });
-                } catch (err) { console.log("Zoom no soportado"); }
+            if (track && track.getCapabilities().zoom) {
+                await track.applyConstraints({ advanced: [{ zoom: e.target.value }] });
             }
         });
 
-        document.getElementById('reader').addEventListener('click', async () => {
-            const track = html5QrCode.getRunningTrack();
-            if (track) await track.applyConstraints({ advanced: [{ focusMode: "continuous" }] });
-        });
+        function confirmarFactura() {
+            facturas.push(facturaTemporal);
+            actualizarInterfaz();
+            document.getElementById('validation-modal').classList.add('hidden');
+            html5QrCode.resume();
+        }
 
-        // Inicio con Alta Resolución
-        html5QrCode.start(
-            { facingMode: "environment" }, 
-            { 
-                fps: 20, 
-                qrbox: (w, h) => { return { width: w * 0.8, height: w * 0.8 } },
-                videoConstraints: {
-                    width: { ideal: 1920 },
-                    height: { ideal: 1080 }
-                }
-            }, 
-            onScanSuccess
-        );
+        function actualizarInterfaz() {
+            const lista = document.getElementById('lista');
+            lista.innerHTML = facturas.map(f => `
+                <div class="flex justify-between bg-slate-50 p-3 rounded-xl border border-slate-100">
+                    <span class="font-mono text-xs">${f.letra} ${f.nro}</span>
+                    <span class="font-bold text-xs text-blue-600">$${f.importe}</span>
+                </div>
+            `).join('');
+            document.getElementById('count').innerText = facturas.length;
+        }
 
-        // --- EXPORTAR ---
         function exportarColppy() {
-            if(facturas.length === 0) return;
-            let csv = "Tipo de Comprobante;Letra;Razon Social del Proveedor;CUIT del proveedor;Numero de Factura;Fecha Contable;Fecha Factura;Fecha de Vencimiento;Descripcion de la Compra;Total Factura\n";
-            facturas.forEach(f => {
-                csv += `${f.tipo};${f.letra};;${f.cuit};${f.nro};${f.fecha};${f.fecha};${f.fecha};Carga automatica QR;${f.importe}\n`;
-            });
+            let csv = "Tipo de Comprobante;Letra;Razon Social;CUIT;Numero;Fecha Contable;Fecha Factura;Total\n";
+            facturas.forEach(f => csv += `FAC;${f.letra};;${f.cuit};${f.nro};${f.fecha};${f.fecha};${f.importe}\n`);
             const blob = new Blob(["\ufeff" + csv], { type: 'text/csv;charset=utf-8;' });
-            const url = URL.createObjectURL(blob);
             const a = document.createElement("a");
-            a.href = url;
-            a.download = "carga_colppy.csv";
+            a.href = URL.createObjectURL(blob);
+            a.download = "colppy.csv";
             a.click();
         }
 
-        function exportarNormal() {
-            let t = "FACTURAS:\n";
-            facturas.forEach(f => t += `${f.fecha} - ${f.letra} ${f.nro} - $${f.importe}\n`);
-            navigator.clipboard.writeText(t);
-            alert("Copiado.");
-        }
+        function cancelarEscaneo() { document.getElementById('validation-modal').classList.add('hidden'); html5QrCode.resume(); }
+        function limpiarTabla() { facturas = []; actualizarInterfaz(); }
 
-        function limpiarTabla() { if(confirm("¿Borrar todo?")) { facturas = []; actualizarTabla(); } }
+        iniciarCamara();
     </script>
 </body>
 </html>

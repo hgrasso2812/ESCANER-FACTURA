@@ -11,8 +11,8 @@
 
     <div class="w-full max-w-lg bg-white rounded-3xl shadow-2xl overflow-hidden">
         <div class="bg-blue-600 p-5 text-white text-center">
-            <h1 class="text-2xl font-black tracking-tight">Carga Colppy</h1>
-            <p class="text-blue-200 text-sm">Escáner de Facturas</p>
+            <h1 class="text-2xl font-black tracking-tight">Carga de Facturas</h1>
+            <p class="text-blue-200 text-sm">Escáner ARCA/AFIP</p>
         </div>
 
         <div class="p-5">
@@ -25,7 +25,7 @@
             
             <div id="tips" class="hidden mt-4 bg-yellow-50 border border-yellow-200 p-3 rounded-xl">
                 <p class="text-xs text-yellow-800 text-center font-medium">
-                    💡 <b>Tip:</b> Alejá la factura unos 20cm. Si hay poca luz, prendé la linterna desde el menú de tu celular.
+                    💡 <b>Tip:</b> Alejá la factura unos 20cm para que haga foco.
                 </p>
             </div>
 
@@ -41,7 +41,7 @@
                 </div>
             </div>
 
-            <div class="mt-8">
+            <div class="mt-8 border-t pt-4">
                 <div class="flex justify-between items-center mb-3">
                     <h3 class="font-bold text-slate-700">Facturas Leídas: <span id="count" class="text-blue-600">0</span></h3>
                     <button onclick="limpiarTabla()" class="text-xs font-bold text-red-500 bg-red-50 px-3 py-1 rounded-lg">Vaciar Lista</button>
@@ -49,9 +49,16 @@
                 <div id="lista" class="space-y-2 max-h-48 overflow-y-auto pr-1"></div>
             </div>
 
-            <button onclick="exportarColppy()" class="w-full mt-6 bg-emerald-600 text-white py-4 rounded-2xl font-bold shadow-lg active:scale-95 transition-transform">
-                📥 DESCARGAR CSV (COLPPY)
-            </button>
+            <div class="grid grid-cols-2 gap-3 mt-6">
+                <button onclick="exportarNormal()" class="bg-slate-800 text-white py-4 rounded-2xl font-bold shadow-lg active:scale-95 transition-transform text-sm flex flex-col items-center justify-center">
+                    <span>💬 MODO NORMAL</span>
+                    <span class="text-[10px] font-normal opacity-70">(Copiar WhatsApp)</span>
+                </button>
+                <button onclick="exportarColppy()" class="bg-emerald-600 text-white py-4 rounded-2xl font-bold shadow-lg active:scale-95 transition-transform text-sm flex flex-col items-center justify-center">
+                    <span>📥 MODO COLPPY</span>
+                    <span class="text-[10px] font-normal opacity-70">(Descargar CSV)</span>
+                </button>
+            </div>
         </div>
     </div>
 
@@ -90,32 +97,23 @@
 
             html5QrCode = new Html5Qrcode("reader");
 
-            try {
-                const devices = await Html5Qrcode.getCameras();
-                if (devices && devices.length) {
-                    let cameraId = devices[devices.length - 1].id; 
-                    for (const device of devices) {
-                        if (device.label.toLowerCase().includes("back") || device.label.toLowerCase().includes("trasera")) {
-                            cameraId = device.id;
-                            break;
-                        }
-                    }
+            const config = { 
+                fps: 15, 
+                qrbox: { width: 250, height: 250 }
+            };
 
-                    // Forzamos resolución alta para leer puntos chicos
-                    await html5QrCode.start(
-                        cameraId, 
-                        { 
-                            fps: 15, 
-                            qrbox: { width: 250, height: 250 },
-                            videoConstraints: { width: { ideal: 1920 }, height: { ideal: 1080 } } 
-                        },
-                        onScanSuccess
-                    );
-                } else {
-                    alert("No se detectó cámara.");
+            try {
+                // Intento 1: Forzar cámara trasera estrictamente
+                await html5QrCode.start({ facingMode: { exact: "environment" } }, config, onScanSuccess);
+            } catch (err1) {
+                try {
+                    // Intento 2: Si el exact falla (pasa en algunos celus), pedir entorno preferido
+                    await html5QrCode.start({ facingMode: "environment" }, config, onScanSuccess);
+                } catch (err2) {
+                    alert("Error al acceder a la cámara trasera. Asegurate de darle permisos al navegador.");
+                    document.getElementById('btn-start').classList.remove('hidden');
+                    document.getElementById('reader').style.display = "none";
                 }
-            } catch (err) {
-                alert("Error al acceder a la cámara. Revisa los permisos del navegador.");
             }
         }
 
@@ -140,6 +138,17 @@
                 </div>
             `).join('');
             document.getElementById('count').innerText = facturas.length;
+        }
+
+        function exportarNormal() {
+            if (facturas.length === 0) return alert("Cargá al menos una factura primero.");
+            let texto = "*RESUMEN DE FACTURAS ESCANEADAS:*\n\n";
+            facturas.forEach(f => {
+                texto += `📅 ${f.fecha} | 📄 ${f.letra} ${f.nro} | 💰 $${f.importe}\n`;
+            });
+            navigator.clipboard.writeText(texto)
+                .then(() => alert("¡Copiado! Ya podés pegarlo en WhatsApp."))
+                .catch(err => alert("Error al copiar al portapapeles."));
         }
 
         function exportarColppy() {

@@ -6,72 +6,87 @@
     <title>Scanner ARCA para Colppy</title>
     <script src="https://unpkg.com/html5-qrcode"></script>
     <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        #reader { width: 100%; border-radius: 12px; overflow: hidden; }
+        #reader__dashboard_section_csr button { background: #3b82f6; color: white; padding: 5px 10px; border-radius: 5px; }
+    </style>
 </head>
-<body class="bg-gray-100 p-4">
-    <div class="max-w-2xl mx-auto bg-white p-6 rounded-lg shadow-lg">
-        <h1 class="text-2xl font-bold text-center mb-4 text-blue-600">Scanner Contable</h1>
+<body class="bg-gray-100 min-h-screen p-4">
+    <div class="max-w-xl mx-auto bg-white p-6 rounded-2xl shadow-xl">
+        <h1 class="text-2xl font-bold text-center mb-2 text-blue-700">Scanner Contable</h1>
+        <p class="text-center text-gray-500 text-sm mb-6">Enfocá el QR y confirmá los datos</p>
         
-        <div id="reader" class="overflow-hidden rounded-lg border-2 border-dashed border-gray-300"></div>
-        
-        <div id="validation-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4">
-            <div class="bg-white p-6 rounded-lg w-full max-w-sm">
-                <h2 class="font-bold text-lg mb-2">Validar Comprobante</h2>
-                <p class="text-sm text-gray-600 mb-4">El QR dice que la factura es:</p>
-                <div id="qr-info" class="bg-yellow-100 p-3 rounded font-mono text-center text-xl mb-4 border border-yellow-400"></div>
-                <p class="text-sm mb-4 italic">¿Coincide con el número que ves en el papel?</p>
-                <div class="flex gap-2">
-                    <button onclick="cancelarEscaneo()" class="flex-1 bg-gray-200 py-2 rounded">No, descartar</button>
-                    <button onclick="confirmarFactura()" class="flex-1 bg-green-500 text-white py-2 rounded font-bold">Sí, es correcta</button>
+        <div class="relative">
+            <div id="reader"></div>
+            <div class="absolute bottom-2 right-2 flex gap-2">
+                <button onclick="alternarLinterna()" class="bg-yellow-400 p-2 rounded-full shadow-lg text-xs font-bold">🔦 Flash</button>
+            </div>
+        </div>
+        <p class="text-center text-xs text-gray-400 mt-2">¿No enfoca? Toca el video para re-enfocar.</p>
+
+        <div id="validation-modal" class="hidden fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
+            <div class="bg-white p-6 rounded-xl w-full max-w-sm">
+                <h2 class="font-bold text-xl mb-1 text-center text-red-600">¡Validar Factura!</h2>
+                <p class="text-sm text-gray-600 mb-4 text-center">Verificá que el número en el papel sea:</p>
+                <div id="qr-info" class="bg-gray-100 p-4 rounded-lg font-mono text-center text-2xl mb-4 border-2 border-blue-500 text-blue-700"></div>
+                <div class="flex gap-3">
+                    <button onclick="cancelarEscaneo()" class="flex-1 bg-gray-200 py-3 rounded-lg font-bold">DESCARTAR</button>
+                    <button onclick="confirmarFactura()" class="flex-1 bg-green-600 text-white py-3 rounded-lg font-bold">ES CORRECTA</button>
                 </div>
             </div>
         </div>
 
         <div class="mt-8">
-            <div class="flex justify-between items-center mb-2">
-                <h3 class="font-bold">Facturas Escaneadas (<span id="count">0</span>)</h3>
-                <button onclick="limpiarTabla()" class="text-red-500 text-sm">Limpiar todo</button>
+            <div class="flex justify-between items-center mb-3">
+                <h3 class="font-bold text-gray-700">Lista para procesar (<span id="count">0</span>)</h3>
+                <button onclick="limpiarTabla()" class="text-red-500 text-xs font-semibold uppercase tracking-wider">Borrar todo</button>
             </div>
-            <div class="overflow-x-auto">
-                <table id="facturaTable" class="w-full text-xs text-left border-collapse border border-gray-200">
-                    <thead class="bg-gray-50">
+            <div class="max-h-60 overflow-y-auto border rounded-lg">
+                <table id="facturaTable" class="w-full text-xs text-left border-collapse">
+                    <thead class="bg-gray-100 sticky top-0">
                         <tr>
-                            <th class="border p-2">Fecha</th>
-                            <th class="border p-2">Número</th>
-                            <th class="border p-2">Total</th>
+                            <th class="p-3 border-b">Fecha</th>
+                            <th class="p-3 border-b">Número</th>
+                            <th class="p-3 border-b text-right">Total</th>
                         </tr>
                     </thead>
-                    <tbody></tbody>
+                    <tbody class="divide-y">
+                        </tbody>
                 </table>
             </div>
         </div>
 
-        <div class="grid grid-cols-2 gap-4 mt-6">
-            <button onclick="exportarNormal()" class="bg-blue-500 text-white p-3 rounded-lg font-bold shadow-md hover:bg-blue-600">MODO NORMAL (WhatsApp)</button>
-            <button onclick="exportarColppy()" class="bg-green-600 text-white p-3 rounded-lg font-bold shadow-md hover:bg-green-700">MODO COLPPY (CSV)</button>
+        <div class="grid grid-cols-1 gap-3 mt-6">
+            <button onclick="exportarNormal()" class="bg-blue-600 text-white py-4 rounded-xl font-bold shadow-lg active:scale-95 transition-transform">
+                COPIAR PARA WHATSAPP
+            </button>
+            <button onclick="exportarColppy()" class="bg-emerald-600 text-white py-4 rounded-xl font-bold shadow-lg active:scale-95 transition-transform">
+                DESCARGAR EXCEL COLPPY
+            </button>
         </div>
     </div>
 
     <script>
         let facturas = [];
         let facturaTemporal = null;
+        let linternaEncendida = false;
 
-        // Diccionarios de AFIP a Letra
+        // Mapeo para Colppy (Ajustado según el CSV que pasaste)
         const mapLetra = { 1: "A", 2: "A", 3: "A", 6: "B", 7: "B", 8: "B", 11: "C", 12: "C", 13: "C" };
-        const mapTipo = { 1: "FAC", 6: "FAC", 11: "FAC" }; // Simplificado, Colppy suele usar FAC para facturas
 
         const html5QrCode = new Html5Qrcode("reader");
 
+        // Función cuando detecta un QR
         function onScanSuccess(decodedText) {
             try {
                 const url = new URL(decodedText);
                 const p = url.searchParams.get("p");
                 const data = JSON.parse(atob(p));
 
-                // Formatear datos
                 const ptoVta = data.ptoVta.toString().padStart(5, '0');
                 const nroCmp = data.nroCmp.toString().padStart(8, '0');
                 const fullNro = `${ptoVta}-${nroCmp}`;
-                const fechaLegible = data.fecha.split('-').reverse().join('/'); // AAAA-MM-DD a DD/MM/AAAA
+                const fechaLegible = data.fecha.split('-').reverse().join('/');
 
                 facturaTemporal = {
                     fecha: fechaLegible,
@@ -82,12 +97,11 @@
                     importe: data.importe.toFixed(2).replace('.', ',')
                 };
 
-                // Mostrar Modal de Validación
                 document.getElementById('qr-info').innerText = fullNro;
                 document.getElementById('validation-modal').classList.remove('hidden');
-                html5QrCode.pause(); // Pausar cámara mientras valida
+                html5QrCode.pause();
             } catch (e) {
-                alert("QR no válido de AFIP/ARCA");
+                console.error("QR no válido");
             }
         }
 
@@ -106,40 +120,78 @@
         function actualizarTabla() {
             const tbody = document.querySelector("#facturaTable tbody");
             tbody.innerHTML = "";
-            facturas.forEach(f => {
-                tbody.innerHTML += `<tr><td class="border p-2">${f.fecha}</td><td class="border p-2">${f.nro}</td><td class="border p-2">$${f.importe}</td></tr>`;
+            facturas.forEach((f, index) => {
+                tbody.innerHTML += `
+                    <tr class="hover:bg-blue-50">
+                        <td class="p-3 border-b">${f.fecha}</td>
+                        <td class="p-3 border-b font-mono">${f.nro}</td>
+                        <td class="p-3 border-b text-right font-bold text-blue-600">$${f.importe}</td>
+                    </tr>`;
             });
             document.getElementById('count').innerText = facturas.length;
         }
 
+        // --- FUNCIONES DE ENFOQUE Y CÁMARA ---
+        
+        async function aplicarEnfoque() {
+            const track = html5QrCode.getRunningTrack();
+            if (track && track.getCapabilities().focusMode) {
+                try {
+                    await track.applyConstraints({ advanced: [{ focusMode: "continuous" }] });
+                } catch (e) { console.log("Foco manual no soportado"); }
+            }
+        }
+
+        async function alternarLinterna() {
+            const track = html5QrCode.getRunningTrack();
+            if (track && track.getCapabilities().torch) {
+                linternaEncendida = !linternaEncendida;
+                await track.applyConstraints({ advanced: [{ torch: linternaEncendida }] });
+            } else {
+                alert("Tu cámara no soporta linterna desde el navegador");
+            }
+        }
+
+        // Tocar el video para re-enfocar
+        document.getElementById('reader').addEventListener('click', aplicarEnfoque);
+
+        // --- EXPORTACIÓN ---
+
         function exportarNormal() {
-            let texto = "LISTA DE FACTURAS:\n";
-            facturas.forEach(f => {
-                texto += `${f.fecha} | ${f.letra} | ${f.nro} | $${f.importe}\n`;
-            });
-            navigator.clipboard.writeText(texto);
-            alert("Copiado al portapapeles para enviar por WhatsApp");
+            if(facturas.length === 0) return alert("No hay facturas");
+            let t = "*RESUMEN DE CARGA:*\n\n";
+            facturas.forEach(f => t += `📅 ${f.fecha} | 📄 ${f.letra} ${f.nro} | 💰 $${f.importe}\n`);
+            navigator.clipboard.writeText(t);
+            alert("¡Copiado! Pegalo en WhatsApp.");
         }
 
         function exportarColppy() {
-            // Cabecera simplificada basada en tu CSV
-            let csvContent = "Tipo de Comprobante;Letra;Razon Social;CUIT;Numero;Fecha Contable;Fecha Factura;Total\n";
-            facturas.forEach(f => {
-                // En Factura C (tipo 11), el total va a Neto No Gravado o similar, aquí lo ponemos en Total para simplificar
-                csvContent += `${f.tipo};${f.letra};;${f.cuit};${f.nro};${f.fecha};${f.fecha};${f.importe}\n`;
-            });
+            if(facturas.length === 0) return alert("No hay facturas");
+            // Cabeceras exactas del archivo que me pasaste
+            let csv = "Tipo de Comprobante;Letra;Razon Social del Proveedor;CUIT del proveedor;Numero de Factura;Fecha Contable;Fecha Factura;Fecha de Vencimiento;Descripcion de la Compra;Total Factura\n";
             
-            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            facturas.forEach(f => {
+                // Mantenemos el formato 00000-00000000 que pide Colppy
+                csv += `${f.tipo};${f.letra};;${f.cuit};${f.nro};${f.fecha};${f.fecha};${f.fecha};Carga automatica QR;${f.importe}\n`;
+            });
+
+            const blob = new Blob(["\ufeff" + csv], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
             const link = document.createElement("a");
-            link.href = URL.createObjectURL(blob);
-            link.setAttribute("download", "importar_colppy.csv");
+            link.href = url;
+            link.download = `Carga_Colppy_${new Date().toLocaleDateString()}.csv`;
             link.click();
         }
 
-        function limpiarTabla() { if(confirm("¿Borrar todo?")) { facturas = []; actualizarTabla(); } }
+        function limpiarTabla() { if(confirm("¿Borrar todas las facturas escaneadas?")) { facturas = []; actualizarTabla(); } }
 
-        // Iniciar Cámara
-        html5QrCode.start({ facingMode: "environment" }, { fps: 10, qrbox: 250 }, onScanSuccess);
+        // Iniciar cámara al cargar
+        html5QrCode.start(
+            { facingMode: "environment" }, 
+            { fps: 20, qrbox: { width: 250, height: 250 } }, 
+            onScanSuccess
+        ).then(aplicarEnfoque);
+
     </script>
 </body>
 </html>

@@ -15,7 +15,7 @@
         </div>
 
         <div class="p-4">
-            <div id="reader" class="bg-black rounded-2xl overflow-hidden"></div>
+            <div id="reader" style="width: 100%; min-height: 300px; background: black; border-radius: 1rem; overflow: hidden;"></div>
             
             <div class="mt-4 bg-slate-100 p-4 rounded-2xl space-y-4">
                 <div class="flex items-center justify-between gap-4">
@@ -26,7 +26,6 @@
                     </div>
                     <button id="torch-button" onclick="alternarLinterna()" class="bg-white p-3 rounded-xl shadow-sm border border-slate-200 text-xl">🔦</button>
                 </div>
-                <p class="text-[10px] text-center text-slate-400 uppercase tracking-widest font-bold">Toca el video si no enfoca</p>
             </div>
 
             <div id="validation-modal" class="hidden fixed inset-0 bg-slate-900/95 flex items-center justify-center p-6 z-50">
@@ -42,7 +41,7 @@
 
             <div class="mt-6">
                 <div class="flex justify-between items-end mb-2">
-                    <h3 class="font-bold">Cargadas: <span id="count" class="text-blue-600">0</span></h3>
+                    <h3 class="font-bold text-sm text-slate-600 uppercase">Cargadas: <span id="count" class="text-blue-600">0</span></h3>
                     <button onclick="limpiarTabla()" class="text-[10px] font-bold text-red-400">BORRAR TODO</button>
                 </div>
                 <div id="lista" class="space-y-2 max-h-40 overflow-y-auto"></div>
@@ -55,65 +54,82 @@
     <script>
         let facturas = [];
         let facturaTemporal = null;
-        let stream = null;
+        let scannerActivo = false;
+        
+        // Corregido el error de sintaxis que rompía el script
+        const mapLetra = { 1: "A", 2: "A", 3: "A", 6: "B", 7: "B", 8: "B", 11: "C", 12: "C", 13: "C" };
         const html5QrCode = new Html5Qrcode("reader");
-
-        // Forzar cámara trasera con restricciones más estrictas
-        const config = {
-            fps: 20,
-            qrbox: (w, h) => ({ width: w * 0.75, height: w * 0.75 }),
-            videoConstraints: {
-                facingMode: { exact: "environment" }, // "exact" obliga a usar la de atrás
-                width: { ideal: 1280 },
-                height: { ideal: 720 }
-            }
-        };
 
         function onScanSuccess(decodedText) {
             try {
                 const url = new URL(decodedText);
-                const data = JSON.parse(atob(url.searchParams.get("p")));
+                const pData = url.searchParams.get("p");
+                const data = JSON.parse(atob(pData));
+                
                 facturaTemporal = {
                     fecha: data.fecha.split('-').reverse().join('/'),
-                    let { 1:"A", 6:"B", 11:"C" }[data.tipoCmp] || "C",
+                    letra: mapLetra[data.tipoCmp] || "C",
                     nro: `${data.ptoVta.toString().padStart(5,'0')}-${data.nroCmp.toString().padStart(8,'0')}`,
                     cuit: data.cuit,
                     importe: data.importe.toFixed(2).replace('.', ',')
                 };
+                
                 document.getElementById('qr-info').innerText = facturaTemporal.nro;
                 document.getElementById('validation-modal').classList.remove('hidden');
                 html5QrCode.pause();
-            } catch (e) { console.error("QR Inválido"); }
+            } catch (e) {
+                console.error("Error procesando QR", e);
+            }
         }
 
-        async function iniciarCamara() {
+        async function iniciar() {
             try {
-                await html5QrCode.start({ facingMode: "environment" }, config, onScanSuccess);
-                // Una vez iniciada, obtenemos el "track" para el zoom y flash
-                const videoElement = document.querySelector('#reader video');
-                stream = videoElement.srcObject;
+                // Configuracion optimizada para moviles
+                const config = {
+                    fps: 15,
+                    qrbox: (w, h) => {
+                        let size = Math.min(w, h) * 0.7;
+                        return { width: size, height: size };
+                    },
+                    aspectRatio: 1.0
+                };
+
+                // Intentamos arrancar la camara trasera directamente
+                await html5QrCode.start(
+                    { facingMode: "environment" }, 
+                    config, 
+                    onScanSuccess
+                );
+                scannerActivo = true;
             } catch (err) {
-                console.error("Error cámara trasera, probando modo flexible...");
-                // Si falla el "exact", probamos sin "exact"
-                await html5QrCode.start({ facingMode: "environment" }, { fps:20, qrbox:250 }, onScanSuccess);
+                console.error("No se pudo iniciar la camara", err);
+                alert("Error al abrir camara. Asegurate de dar permisos y usar HTTPS.");
             }
         }
 
         async function alternarLinterna() {
-            const track = html5QrCode.getRunningTrack();
-            if (track && track.getCapabilities().torch) {
-                const currentTorch = track.getSettings().torch;
-                await track.applyConstraints({ advanced: [{ torch: !currentTorch }] });
-            } else {
-                alert("Flash no disponible en este navegador/celular.");
-            }
+            try {
+                const track = html5QrCode.getRunningTrack();
+                if (track && track.getCapabilities().torch) {
+                    const settings = track.getSettings();
+                    await track.applyConstraints({
+                        advanced: [{ torch: !settings.torch }]
+                    });
+                } else {
+                    alert("Flash no compatible con este navegador.");
+                }
+            } catch (e) { console.error(e); }
         }
 
         document.getElementById('zoom-range').addEventListener('input', async (e) => {
-            const track = html5QrCode.getRunningTrack();
-            if (track && track.getCapabilities().zoom) {
-                await track.applyConstraints({ advanced: [{ zoom: e.target.value }] });
-            }
+            try {
+                const track = html5QrCode.getRunningTrack();
+                if (track && track.getCapabilities().zoom) {
+                    await track.applyConstraints({
+                        advanced: [{ zoom: parseFloat(e.target.value) }]
+                    });
+                }
+            } catch (err) { console.error(err); }
         });
 
         function confirmarFactura() {
@@ -123,31 +139,45 @@
             html5QrCode.resume();
         }
 
+        function cancelarEscaneo() {
+            document.getElementById('validation-modal').classList.add('hidden');
+            html5QrCode.resume();
+        }
+
         function actualizarInterfaz() {
             const lista = document.getElementById('lista');
             lista.innerHTML = facturas.map(f => `
-                <div class="flex justify-between bg-slate-50 p-3 rounded-xl border border-slate-100">
-                    <span class="font-mono text-xs">${f.letra} ${f.nro}</span>
-                    <span class="font-bold text-xs text-blue-600">$${f.importe}</span>
+                <div class="flex justify-between bg-slate-50 p-3 rounded-xl border border-slate-100 text-xs">
+                    <span class="font-mono font-bold">${f.letra} ${f.nro}</span>
+                    <span class="text-blue-600 font-black">$${f.importe}</span>
                 </div>
             `).join('');
             document.getElementById('count').innerText = facturas.length;
         }
 
         function exportarColppy() {
+            if (facturas.length === 0) return alert("Cargá alguna factura primero");
             let csv = "Tipo de Comprobante;Letra;Razon Social;CUIT;Numero;Fecha Contable;Fecha Factura;Total\n";
-            facturas.forEach(f => csv += `FAC;${f.letra};;${f.cuit};${f.nro};${f.fecha};${f.fecha};${f.importe}\n`);
+            facturas.forEach(f => {
+                csv += `FAC;${f.letra};;${f.cuit};${f.nro};${f.fecha};${f.fecha};${f.importe}\n`;
+            });
             const blob = new Blob(["\ufeff" + csv], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
             const a = document.createElement("a");
-            a.href = URL.createObjectURL(blob);
-            a.download = "colppy.csv";
+            a.href = url;
+            a.download = "carga_colppy.csv";
             a.click();
         }
 
-        function cancelarEscaneo() { document.getElementById('validation-modal').classList.add('hidden'); html5QrCode.resume(); }
-        function limpiarTabla() { facturas = []; actualizarInterfaz(); }
+        function limpiarTabla() {
+            if(confirm("¿Borrar lista?")) {
+                facturas = [];
+                actualizarInterfaz();
+            }
+        }
 
-        iniciarCamara();
+        // Ejecutar inicio
+        iniciar();
     </script>
 </body>
 </html>

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Scanner ARCA Pro</title>
+    <title>Scanner ARCA Seguro</title>
     <script src="https://unpkg.com/html5-qrcode"></script>
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
@@ -15,16 +15,23 @@
         </div>
 
         <div class="p-4">
-            <div id="reader" style="width: 100%; min-height: 300px; background: black; border-radius: 1rem; overflow: hidden;"></div>
             
-            <div class="mt-4 bg-slate-100 p-4 rounded-2xl space-y-4">
+            <div id="status-msg" class="text-xs font-mono text-center mb-2 text-red-500 font-bold min-h-[20px]"></div>
+
+            <button id="btn-start" onclick="iniciarCamaraSegura()" class="w-full bg-blue-500 text-white py-4 rounded-xl font-bold mb-4 shadow-lg animate-pulse">
+                📸 TOCAR PARA INICIAR CÁMARA
+            </button>
+
+            <div id="reader" style="width: 100%; min-height: 250px; background: #111; border-radius: 1rem; overflow: hidden; display: none;"></div>
+            
+            <div id="controles-camara" class="hidden mt-4 bg-slate-100 p-4 rounded-2xl space-y-4">
                 <div class="flex items-center justify-between gap-4">
                     <div class="flex-1">
                         <label class="text-[10px] font-bold uppercase text-slate-500">Zoom Manual</label>
                         <input type="range" id="zoom-range" min="1" max="5" step="0.1" value="1" 
                                class="w-full h-2 bg-blue-200 rounded-lg appearance-none cursor-pointer">
                     </div>
-                    <button id="torch-button" onclick="alternarLinterna()" class="bg-white p-3 rounded-xl shadow-sm border border-slate-200 text-xl">🔦</button>
+                    <button onclick="alternarLinterna()" class="bg-white p-3 rounded-xl shadow-sm border border-slate-200 text-xl">🔦</button>
                 </div>
             </div>
 
@@ -39,26 +46,28 @@
                 </div>
             </div>
 
-            <div class="mt-6">
+            <div class="mt-6 border-t pt-4">
                 <div class="flex justify-between items-end mb-2">
                     <h3 class="font-bold text-sm text-slate-600 uppercase">Cargadas: <span id="count" class="text-blue-600">0</span></h3>
-                    <button onclick="limpiarTabla()" class="text-[10px] font-bold text-red-400">BORRAR TODO</button>
+                    <button onclick="limpiarTabla()" class="text-[10px] font-bold text-red-400 border border-red-200 px-2 py-1 rounded">BORRAR TODO</button>
                 </div>
                 <div id="lista" class="space-y-2 max-h-40 overflow-y-auto"></div>
             </div>
 
-            <button onclick="exportarColppy()" class="w-full mt-6 bg-emerald-600 text-white py-4 rounded-2xl font-bold shadow-lg">DESCARGAR PARA COLPPY</button>
+            <button onclick="exportarColppy()" class="w-full mt-4 bg-emerald-600 text-white py-4 rounded-2xl font-bold shadow-lg">DESCARGAR PARA COLPPY</button>
         </div>
     </div>
 
     <script>
         let facturas = [];
         let facturaTemporal = null;
-        let scannerActivo = false;
-        
-        // Corregido el error de sintaxis que rompía el script
+        let html5QrCode = null;
+
         const mapLetra = { 1: "A", 2: "A", 3: "A", 6: "B", 7: "B", 8: "B", 11: "C", 12: "C", 13: "C" };
-        const html5QrCode = new Html5Qrcode("reader");
+
+        function logError(msg) {
+            document.getElementById('status-msg').innerText = msg;
+        }
 
         function onScanSuccess(decodedText) {
             try {
@@ -76,72 +85,88 @@
                 
                 document.getElementById('qr-info').innerText = facturaTemporal.nro;
                 document.getElementById('validation-modal').classList.remove('hidden');
-                html5QrCode.pause();
+                if(html5QrCode) html5QrCode.pause();
             } catch (e) {
-                console.error("Error procesando QR", e);
+                // Si lee un QR que no es de AFIP, lo ignoramos silenciosamente
+                console.log("QR no reconocido");
             }
         }
 
-        async function iniciar() {
-            try {
-                // Configuracion optimizada para moviles
-                const config = {
-                    fps: 15,
-                    qrbox: (w, h) => {
-                        let size = Math.min(w, h) * 0.7;
-                        return { width: size, height: size };
-                    },
-                    aspectRatio: 1.0
-                };
+        async function iniciarCamaraSegura() {
+            logError("Pidiendo permisos...");
+            document.getElementById('btn-start').classList.add('hidden');
+            document.getElementById('reader').style.display = "block";
 
-                // Intentamos arrancar la camara trasera directamente
-                await html5QrCode.start(
-                    { facingMode: "environment" }, 
-                    config, 
-                    onScanSuccess
-                );
-                scannerActivo = true;
+            html5QrCode = new Html5Qrcode("reader");
+
+            try {
+                // Paso 1: Pedir lista de cámaras (esto fuerza la pregunta de permisos)
+                const devices = await Html5Qrcode.getCameras();
+                if (devices && devices.length) {
+                    // Buscar la cámara trasera. Si hay varias, suele ser la última del array en móviles
+                    let cameraId = devices[devices.length - 1].id; 
+                    for (const device of devices) {
+                        if (device.label.toLowerCase().includes("back") || device.label.toLowerCase().includes("trasera")) {
+                            cameraId = device.id;
+                            break;
+                        }
+                    }
+
+                    logError("Iniciando cámara trasera...");
+
+                    // Paso 2: Iniciar con el ID específico
+                    await html5QrCode.start(
+                        cameraId, 
+                        { fps: 15, qrbox: { width: 250, height: 250 } },
+                        onScanSuccess
+                    );
+
+                    logError(""); // Limpiar errores
+                    document.getElementById('controles-camara').classList.remove('hidden');
+
+                } else {
+                    logError("No se encontraron cámaras en el dispositivo.");
+                }
             } catch (err) {
-                console.error("No se pudo iniciar la camara", err);
-                alert("Error al abrir camara. Asegurate de dar permisos y usar HTTPS.");
+                document.getElementById('btn-start').classList.remove('hidden');
+                document.getElementById('reader').style.display = "none";
+                logError("Error: " + err.message || err);
             }
         }
 
         async function alternarLinterna() {
             try {
+                if(!html5QrCode) return;
                 const track = html5QrCode.getRunningTrack();
                 if (track && track.getCapabilities().torch) {
-                    const settings = track.getSettings();
-                    await track.applyConstraints({
-                        advanced: [{ torch: !settings.torch }]
-                    });
+                    const isTorchOn = track.getSettings().torch;
+                    await track.applyConstraints({ advanced: [{ torch: !isTorchOn }] });
                 } else {
-                    alert("Flash no compatible con este navegador.");
+                    alert("Tu celular no permite controlar el flash desde el navegador web.");
                 }
-            } catch (e) { console.error(e); }
+            } catch (e) { console.error("Error flash", e); }
         }
 
         document.getElementById('zoom-range').addEventListener('input', async (e) => {
             try {
+                if(!html5QrCode) return;
                 const track = html5QrCode.getRunningTrack();
                 if (track && track.getCapabilities().zoom) {
-                    await track.applyConstraints({
-                        advanced: [{ zoom: parseFloat(e.target.value) }]
-                    });
+                    await track.applyConstraints({ advanced: [{ zoom: parseFloat(e.target.value) }] });
                 }
-            } catch (err) { console.error(err); }
+            } catch (err) { console.error("Error zoom", err); }
         });
 
         function confirmarFactura() {
             facturas.push(facturaTemporal);
             actualizarInterfaz();
             document.getElementById('validation-modal').classList.add('hidden');
-            html5QrCode.resume();
+            if(html5QrCode) html5QrCode.resume();
         }
 
         function cancelarEscaneo() {
             document.getElementById('validation-modal').classList.add('hidden');
-            html5QrCode.resume();
+            if(html5QrCode) html5QrCode.resume();
         }
 
         function actualizarInterfaz() {
@@ -175,9 +200,6 @@
                 actualizarInterfaz();
             }
         }
-
-        // Ejecutar inicio
-        iniciar();
     </script>
 </body>
 </html>
